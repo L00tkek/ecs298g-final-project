@@ -151,7 +151,7 @@ const traits = [
 const royalTrait = {
     name: "royal",
     eval: function(action) {
-        return 1
+        return 0
     }
 }
 
@@ -198,7 +198,7 @@ function generateCharacters(nChars, nTraits) {
 function updateGoals(action) {
     goals = mapcat(
         goals, function(goal) {
-            let updates = tryAdvance(goal, db, "", db.getNewestEID())
+            let updates = tryAdvance(goal, db.db, "", db.getNewestEID())
 
             // by my understanding, this strips out empty/unbound goals that
             // are kept around to capture future opportunities to match the
@@ -226,7 +226,7 @@ function allPossibleActions(actor) {
             //actor: actor,
             actor: actor.name,
             tags: spec.tags,
-            print: spec.print,
+            print: spec.print(actor.name),
         })
     }
 
@@ -239,7 +239,7 @@ function allPossibleActions(actor) {
                 //target: target,
                 target: target.name,
                 tags: spec.tags,
-                print: spec.print,
+                print: spec.print(actor.name, target.name),
             })
         }
     }
@@ -247,14 +247,28 @@ function allPossibleActions(actor) {
     return possible
 }
 
-function goalsAdvanced(action) {
-    nextDB = db.addEvent(action)
-    allUpdates = []
+function updateLength(updateList) {
+    let len = updateList.length
+
+    for (update of updateList) {
+        while (update.parent !== undefined) {
+            update = update.parent
+            len++
+        }
+    }
+
+    return len
+}
+
+function winnowEval(action) {
+    let nextDB = db.addEvent(action)
+    let allUpdates = []
     for (let goal of goals) {
-        let updates = tryAdvance(goal, nextDB, "", nextDB.getNewestEID())
+        let updates = tryAdvance(goal, nextDB.db, "", nextDB.getNewestEID())
         allUpdates = allUpdates.concat(updates)
     }
-    return allUpdates.length
+
+    return updateLength(allUpdates) - updateLength(goals)
 }
 
 
@@ -262,42 +276,78 @@ function goalsAdvanced(action) {
 // `action` is an action with properties `eventType`, `actor`, (optionally) `target`, and `tags`
 // evaluate returns a number representing how much actor wants to do action
 function evaluate(actor, action) {
-    util = 1 //avoids probabilities of 0
+    let util = 0 //avoids probabilities of 0
 
     for (let trait of actor.traits) {
         util += trait.eval(action)
     }
 
-    //util += 100 * goalsAdvanced(action) TODO add back
-
     return util
 }
 
 // `actor` is a character
-function act(actor) {
-    actions = allPossibleActions(actor)
-    weights = actions.map((action) => evaluate(actor, action))
+function chooseAction(actor) {
+    allActions = allPossibleActions(actor)
+    let all = []
+    let actions = []
+    let weights = []
+
+    let maxU = -Infinity
+    let maxD = -Infinity
+    for (const action of allActions) {
+        let utility = evaluate(actor, action)
+        let drama = winnowEval(action)
+
+        maxU = Math.max(utility, maxU)
+        maxD = Math.max(drama, maxD)
+
+        all.push({
+            action: action,
+            util: utility,
+            drama: drama,
+        })
+    }
+
+    for (let thing of all) {
+        let utility = thing.util / maxU
+        let drama = thing.drama / maxD
+        // this is the line that determines the priority between satisfying the
+        // drama manager and satisfying the character's utility function
+        // TODO shape these values (logistic curve?)
+        let weight = 2 * utility + 8 * drama
+        if (weight <= 0) continue //prune useless actions
+
+        actions.push(thing.action)
+        weights.push(weight)
+
+        console.log(`${thing.action.print} (weight ${weight})`)
+    }
+
     return chooseWeighted(actions, weights)
+}
+
+function performAction(action) {
+    if (action.target === undefined)
+    {
+        //action is monadic
+        write(action.print)
+    }
+    else {
+        // action is dyadic
+        write(action.print)
+    }
+
+    db = db.addEvent(action)
+    updateGoals(action)
 }
 
 function allAct() {
     let i = 0
 
     return function() {
-        actor = chars[i]
-        action = act(actor)
-        if (action.target === undefined)
-        {
-            //action is monadic
-            write(action.print(action.actor))
-        }
-        else {
-            // action is dyadic
-            write(action.print(action.actor, action.target))
-        }
-
-        //db = db.addEvent(action)
-        //updateGoals(action) TODO add back
+        let actor = chars[i]
+        let action = chooseAction(actor)
+        performAction(action)
         i = (i + 1) % chars.length
     }
 }
