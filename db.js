@@ -1,3 +1,6 @@
+// TODO: add some code that cleans up the DB; it's getting super cluttered.
+// maybe keep the last ~30 events?
+
 // lots of code in this file was adapted from Loose Ends, which can be found at
 // https://github.com/ItsProbablyFine/LooseEnds/tree/1b3931177ad4ced483e236cb7c399c466a490048
 

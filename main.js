@@ -1,18 +1,23 @@
+// TODO: learn typescript
 // current list of tags:
 // religious, food, friendly, assassin, unfriendly, violent, romantic
 
 const soloEvents = [
-    {eventType: "prayAlone", tags: ["religious"], 
+    {eventType: "prayAlone", tags: ["religious", "solo"], 
         print: function(actor) {
             return `${actor} prays quietly.`
         }},
-    {eventType: "eatAlone", tags: ["food"],
+    {eventType: "eatAlone", tags: ["food", "solo"],
         print: function(actor) {
             return `${actor} eats a snack.`
         }},
-    {eventType: "drinkAlone", tags: ["food"],
+    {eventType: "drinkAlone", tags: ["food", "solo"],
         print: function(actor) {
             return `${actor} takes a sip of ${choose(["water", "wine", "ale"])}.`
+        }},
+    {eventType: "makeGrandSpeech", tags: ["royal"],
+        print: function(actor) {
+            return `${actor} makes a grand speech.`
         }},
 ]
 
@@ -33,15 +38,15 @@ const duoEvents = [
         print: function(actor, target) {
             return `${actor} calls ${target} something unkind.`
         }},
-    {eventType: "fightSomeone", tags: ["unfriendly", "violent"], 
+    {eventType: "fightSomeone", tags: ["unfriendly", "violent", "assassin"], 
         print: function(actor, target) {
             return `${actor} ${choose(["punches", "slaps", "kicks", "bites"])} ${target}!`
         }},
-    {eventType: "flirtsWithSomeone", tags: ["romantic", "friendly"],
+    {eventType: "flirtsWithSomeone", tags: ["romantic", "assassin"],
         print: function(actor, target) {
             return `${actor} flirts with ${target}.`
         }},
-    {eventType: "kissesSomeone", tags: ["romantic", "friendly"],
+    {eventType: "kissesSomeone", tags: ["romantic"],
         print: function(actor, target) {
             return `${actor} and ${target} kiss ${choose(["softly", "passionately"])}.`
         }},
@@ -104,10 +109,14 @@ const traits = [
     {
         name: "friendly",
         eval: function(action) {
+            let util = 0
             if (action.tags.includes("friendly")) {
-                return 5
+                util += 5
             }
-            return 0
+            if (action.tags.includes("solo")) {
+                util -= 2.5
+            }
+            return util
         }
     },
     {
@@ -122,7 +131,14 @@ const traits = [
     {
         name: "unfriendly",
         eval: function(action) {
-            if (action.tags.includes("unfriendly") || action.tags.includes("violent")) {
+            // we want violent actions to be less frequent, but a lot of
+            // unfriendly actions are also tagged as violent, so we give
+            // priority to checks for the violent tag to ensure we're correctly
+            // assigning utility scores
+            if (action.tags.includes("violent")) {
+                return 2.5
+            }
+            if (action.tags.includes("unfriendly") || action.tags.includes("solo")) {
                 return 5
             }
             return 0
@@ -140,10 +156,14 @@ const traits = [
     {
         name: "pious",
         eval: function(action) {
+            let util = 0
             if (action.tags.includes("religious")) {
-                return 5
+                util += 5
             }
-            return 0
+            if (action.tags.includes ("romantic")) {
+                util -= 2.5
+            }
+            return util
         }
     },
 ]
@@ -151,7 +171,14 @@ const traits = [
 const royalTrait = {
     name: "royal",
     eval: function(action) {
-        return 0
+        let util = 0
+        if (action.tags.includes("violent")) {
+            util -= 5
+        }
+        if (action.tags.includes("royal")) {
+            util += 7.5
+        }
+        return util
     }
 }
 
@@ -172,29 +199,8 @@ function generateCharacters(nChars, nTraits) {
         }
     })
 }
-  //for (const eventSpec of basicSoloEventSpecs) {
-  //  for (const c of charIDs) {
-  //    allPossibleActions.push({
-  //      type: "event",
-  //      eventType: eventSpec.eventType,
-  //      tags: eventSpec.tags,
-  //      actor: c
-  //    });
-  //  }
-  //}
-  //for (const eventSpec of basicDyadicEventSpecs) {
-  //  for (const [c1, c2] of charIDPairs) {
-  //    allPossibleActions.push({
-  //      type: "event",
-  //      eventType: eventSpec.eventType,
-  //      tags: eventSpec.tags,
-  //      actor: c1,
-  //      target: c2
-  //    });
-  //  }
-  //}
 
-// we assume the DB has already been updated
+// we assume the DB has already been updated in this function
 function updateGoals(action) {
     goals = mapcat(
         goals, function(goal) {
@@ -217,6 +223,11 @@ function updateGoals(action) {
 }
 
 
+// to be clear, the objects in soloEvents and duoEvents are event
+// *specifications*, they don't actually describe an instantiated event (since
+// they don't have a bound actor or target). an instantiated action is bound to
+// a particular actor (and possible target), which is why we get to replace the
+// print function with a print string.
 function allPossibleActions(actor) {
     possible = []
 
@@ -260,6 +271,11 @@ function updateLength(updateList) {
     return len
 }
 
+// TODO: implement this
+function isActiveGoal(goal) {
+    return
+}
+
 function winnowEval(action) {
     let nextDB = db.addEvent(action)
     let allUpdates = []
@@ -282,91 +298,63 @@ function evaluate(actor, action) {
         util += trait.eval(action)
     }
 
+    // TODO: add regard checking stuff
+
     return util
 }
 
+// I want to normalize the utility and drama values to some degree, and it
+// seems somewhat reasonable to divide by the average? we'll take a running
+// average to make it more performant
+//let avgU = 5 //set up sensible defaults to avoid divide by 0 errors
+//let avgD = 1
 // `actor` is a character
 function chooseAction(actor) {
     allActions = allPossibleActions(actor)
-    let all = []
     let actions = []
     let weights = []
 
-    let maxU = -Infinity
-    let maxD = -Infinity
-    for (const action of allActions) {
+    for (action of allActions) {
         let utility = evaluate(actor, action)
         let drama = winnowEval(action)
 
-        maxU = Math.max(utility, maxU)
-        maxD = Math.max(drama, maxD)
+        // we want to exclude actions that the character doesn't want to do and
+        // which wouldn't be narratively interesting
+        if (utility <= 0 && drama <= 0) continue
 
-        all.push({
-            action: action,
-            util: utility,
-            drama: drama,
-        })
-    }
+        // my attempt to normalize these values a bit. Utility is basically
+        // capped at 10, and drama seems to hover around 1 or 2 usually
+        let weight = 4 * utility / 5 + 6 * drama / 2
 
-    for (let thing of all) {
-        let utility = thing.util / maxU
-        let drama = thing.drama / maxD
-        // this is the line that determines the priority between satisfying the
-        // drama manager and satisfying the character's utility function
-        // TODO shape these values (logistic curve?)
-        let weight = 2 * utility + 8 * drama
-        if (weight <= 0) continue //prune useless actions
-
-        actions.push(thing.action)
+        actions.push(action)
         weights.push(weight)
-
-        console.log(`${thing.action.print} (weight ${weight})`)
+        console.log(`${action.print} (weight ${weight})`)
     }
 
     return chooseWeighted(actions, weights)
 }
 
 function performAction(action) {
-    if (action.target === undefined)
-    {
-        //action is monadic
-        write(action.print)
-    }
-    else {
-        // action is dyadic
-        write(action.print)
-    }
-
+    write(action.print)
     db = db.addEvent(action)
     updateGoals(action)
 }
 
+// we're going to set this later, and it'll be used to stop acting after a
+// certain interval (which should take ~5 minutes)
+//this avoids the program running too long and having performance issues
+let actionIntervalId = null
+let i = 0
 function allAct() {
-    let i = 0
+    let actor = chars[i]
+    let action = chooseAction(actor)
+    performAction(action)
+    i = (i + 1) % chars.length
 
-    return function() {
-        let actor = chars[i]
-        let action = chooseAction(actor)
-        performAction(action)
-        i = (i + 1) % chars.length
+    if (i >= 150) {
+        clearInterval(actionIntervalID)
     }
 }
-
-//    appState.backgroundPartialMatches = mapcat(
-//      appState.backgroundPartialMatches,
-//      function(partialMatch) {
-//        let possibleMatchUpdates = tryAdvance(partialMatch, appState.db, "", latestEventID);
-//        // greedily replace bpms with advanced versions of themselves,
-//        // except for the baseline empty bpms we keep around to capture later match opportunities
-//        if (possibleMatchUpdates[0].lastStep === "pass"
-//            && possibleMatchUpdates.length > 1
-//            && Object.keys(possibleMatchUpdates[0].bindings).length > 0) {
-//          possibleMatchUpdates = possibleMatchUpdates.slice(1);
-//        }
-//        return possibleMatchUpdates.filter(pmu => pmu.lastStep !== "die");
-//        // FIXME also filter out complete matches?
-//      }
-//    );
 
 let ranInit = false
 function init() {
@@ -378,7 +366,7 @@ function init() {
 
     // generate characters with random names and trait combos, including one
     // who's given the royal trait, then add them to the DB
-    let nChars = 4
+    let nChars = 7
     let nTraits = 2
     let writeChars = initWriter("charInfo", 15)
     chars = generateCharacters(nChars, nTraits)
@@ -399,7 +387,7 @@ function init() {
 
     // actual game loop and output to screen
     write = initWriter("main", 10)
-    setInterval(allAct(), 2000)
+    actionIntervalID = setInterval(allAct, 2000)
 
     ranInit = true
 }
