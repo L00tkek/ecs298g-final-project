@@ -1,0 +1,151 @@
+\documentclass[letterpaper]{article}
+% DO NOT CHANGE THIS
+\usepackage{aaai24} % DO NOT CHANGE THIS
+\usepackage{times} % DO NOT CHANGE THIS
+\usepackage{helvet} % DO NOT CHANGE THIS
+\usepackage{courier} % DO NOT CHANGE THIS
+\usepackage[hyphens]{url} % DO NOT CHANGE THIS
+\usepackage{graphicx} % DO NOT CHANGE THIS
+\urlstyle{rm} % DO NOT CHANGE THIS
+\def\UrlFont{\rm} % DO NOT CHANGE THIS
+\usepackage{graphicx}  % DO NOT CHANGE THIS
+\usepackage{natbib}  % DO NOT CHANGE THIS
+\usepackage{caption}  % DO NOT CHANGE THIS
+\frenchspacing % DO NOT CHANGE THIS
+\setlength{\pdfpagewidth}{8.5in} % DO NOT CHANGE THIS
+\setlength{\pdfpageheight}{11in} % DO NOT CHANGE THIS
+%
+% Keep the \pdfinfo as shown here. There's no need
+% for you to add the /Title and /Author tags.
+\pdfinfo{
+/TemplateVersion (2024.1)
+}
+
+\setcounter{secnumdepth}{0} %May be changed to 1 or 2 if section numbers are desired.
+
+\title{Shepherd: An Incremental Story Sifting-Based Drama Manager}
+\author {
+    % Authors
+    First Author Name,
+    Jonathan Chung,
+    Joshua McCoy
+}
+\affiliations {
+    % Affiliations
+    University of California, Davis \\
+    \{firstAuthor, secondAuthor, jamccoy\}@ucdavis.edu
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+    Test abstract.
+\end{abstract}
+
+\section{Introduction}
+In the field of interactive emergent narrative, there is a distinction made between a
+chronicle of simulated events and a narrative. The key element that transforms a chronicle
+into a narrative is curation, the process of cutting out narratively irrelevant content
+from a chronicle to create a narrative. However, this raises an important question: how do
+we decide which parts of a chronicle constitute a narrative?
+
+Oftentimes, as in the case of Bad News, humans are able to intuitively find small
+sequences of narratively interesting content, and then assemble those sequences into a
+larger narrative. This process has been termed “story sifting.” To aid in automatic
+narrative curation, automatic story sifters such as Felt and Sheldon were created. These
+automatic story sifters accept human-authored “story templates,” which are high-level
+descriptions of small sequences of narratively interesting material. Given a chronicle of
+simulated events and a set of story templates, automatic story sifters can identify themes
+such as “violation of hospitality” or “repeated betrayals,” which can later be assembled
+into a narrative. 
+
+Later, the notion of “incremental story sifting” was implemented in Winnow, the successor
+language to Felt. Winnow is capable of identifying partially-fulfilled story templates in
+a simulation currently in progress, which the authors note could potentially be used for
+foreshadowing future plot developments, i.e. the completion of the partially-filled
+template in question. However, this also opens up the possibility of using Winnow, or any
+other incremental story sifter, as a sort of drama manager to guide a simulation in
+progress towards making choices that progress any partially-filled story templates it
+detects. This was explored to some degree by Loose Ends, a mixed-initiative authoring
+system which uses Winnow to suggest plot developments for a human to choose between.
+However, this technique has not yet been explored as part of a fully autonomous
+simulation, without any human guidance. 
+
+In this work, we contribute the first (to our knowledge) instance of a story sifter being
+leveraged for drama management in a simulation with no human input, as well as an
+evaluation of the stories such a system can construct. Our system differs from other story
+sifters due to the fact that it sifts alongside the generator, allowing our system to have
+focused, curated narratives alongside the variance of a chaotic generator. It nudges the
+course of the narrative rather than outright demanding that certain events take place,
+allowing our system to follow story structures in interesting ways while still retaining a
+degree of control and coherence. The creativity and cohesion of the stories our system
+will generate will be proof that this method of incremental story sifting alongside
+generation is a viable and ripe path to pursue.
+
+\section{Related Works}
+This work is very informed by Curating Simulated Storyworlds \cite{ryan:curating} and its
+philosophy on story sifting and emergent narrative, especially as that philosophy is
+instantiated in the theatrical performance piece Bad News. We also directly use the Winnow
+incremental story sifter \cite{kreminski:winnow} in our implementation of this system. Our
+use of story sifting as a drama manager, to guide a simulation in progress, is a
+simulationist extension of its use in the Loose Ends system \cite{kreminski:loose}. Where
+Loose Ends is a “strong story” system, in which a story sifter acts to guide a human
+author with ultimate control over the plot, our proposed system takes a “strong autonomy”
+approach, where the story sifter guides the characters, who otherwise make their own
+decisions. 
+
+Guided by the work of Max Kreminski, Noah Wardrip-Fruin, and Michael Mateas in Authoring
+For Story Sifters \cite{kreminski:authoring}, we intend to address the most glaring issue
+with interactive emergent narrative: “the dissolution of the player-perceived story into a
+structureless mess”.
+
+\section{Technical Description}
+We propose a very simple simulation. Each simulation is instantiated with a set of
+characters, a set of traits for those characters, and a set of actions for those
+characters to take. Actions may apply to nothing, or may apply to some other character in
+the simulation. The simulation handles time as a series of time-steps, where each
+character may take one action per time-step in a predetermined order. Furthermore, the
+simulation tracks a friendliness value between each pair of characters.  
+
+For each character on each time-step, the character will choose an action according to the
+following procedure:
+
+\begin{itemize}
+    \item Generate a pool of possible actions for that character, based on
+        \begin{itemize}
+            \item Actions that advance existing story goals
+            \item A few randomly generated actions, to add unpredictability
+            \item A pool of always-available actions
+            \item A pool of conditionally-available actions whose preconditions are met
+        \end{itemize}
+    \item 
+        Generate a utility score for each action. Utility is based on
+        \begin{itemize}
+            \item The character’s traits
+            \item The relationship between the character and the target of the action (if
+                applicable)
+            \item How many story goals the action would progress
+        \end{itemize}
+    \item Pick an action from the pool randomly, where actions with higher utility scores
+        are more likely to be chosen 
+    \item Update the simulation state to account for the effects of the chosen action
+\end{itemize}
+
+Each action will have an associated natural-language representation template, which will
+be filled in with the appropriate character names once the action is performed. This
+natural-language string will then be written to the frontend to expose that event to the
+reader as part of the simulation chronicle. 
+
+\section{Analysis}
+TBD
+
+\section{Conclusion}
+TBD
+
+\subsection{Future Work}
+TBD
+
+\bibliography{refs}
+
+\end{document}
