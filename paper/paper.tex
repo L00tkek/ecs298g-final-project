@@ -25,15 +25,13 @@
 
 \title{Shepherd: An Incremental Story Sifting-Based Drama Manager}
 \author {
-    % Authors
-    First Author Name,
+    Sage Deo,
     Jonathan Chung,
     Joshua McCoy
 }
 \affiliations {
-    % Affiliations
     University of California, Davis \\
-    \{firstAuthor, secondAuthor, jamccoy\}@ucdavis.edu
+    \{rsdeo, secondAuthor, jamccoy\}@ucdavis.edu
 }
 
 \begin{document}
@@ -53,21 +51,23 @@ we decide which parts of a chronicle constitute a narrative?
 Oftentimes, as in the case of Bad News, humans are able to intuitively find small
 sequences of narratively interesting content, and then assemble those sequences into a
 larger narrative. This process has been termed “story sifting.” To aid in automatic
-narrative curation, automatic story sifters such as Felt and Sheldon were created. These
+narrative curation, automatic story sifters such as Felt \cite{kreminski:felt} and Sheldon
+\cite{ryan:curating} were created. These
 automatic story sifters accept human-authored “story templates,” which are high-level
 descriptions of small sequences of narratively interesting material. Given a chronicle of
 simulated events and a set of story templates, automatic story sifters can identify themes
 such as “violation of hospitality” or “repeated betrayals,” which can later be assembled
 into a narrative. 
 
-Later, the notion of “incremental story sifting” was implemented in Winnow, the successor
+Later, the notion of “incremental story sifting” was implemented in Winnow
+\cite{kreminski:winnow}, the successor
 language to Felt. Winnow is capable of identifying partially-fulfilled story templates in
 a simulation currently in progress, which the authors note could potentially be used for
 foreshadowing future plot developments, i.e. the completion of the partially-filled
 template in question. However, this also opens up the possibility of using Winnow, or any
 other incremental story sifter, as a sort of drama manager to guide a simulation in
 progress towards making choices that progress any partially-filled story templates it
-detects. This was explored to some degree by Loose Ends, a mixed-initiative authoring
+detects. This was explored to some degree by Loose Ends \cite{kreminski:loose}, a mixed-initiative authoring
 system which uses Winnow to suggest plot developments for a human to choose between.
 However, this technique has not yet been explored as part of a fully autonomous
 simulation, without any human guidance. 
@@ -83,13 +83,15 @@ degree of control and coherence. The creativity and cohesion of the stories our 
 will generate will be proof that this method of incremental story sifting alongside
 generation is a viable and ripe path to pursue.
 
-\section{Related Works}
+\section{Related Work}
 This work is very informed by Curating Simulated Storyworlds \cite{ryan:curating} and its
 philosophy on story sifting and emergent narrative, especially as that philosophy is
 instantiated in the theatrical performance piece Bad News. We also directly use the Winnow
-incremental story sifter \cite{kreminski:winnow} in our implementation of this system. Our
+incremental story sifter in our implementation of this system. Our
 use of story sifting as a drama manager, to guide a simulation in progress, is a
-simulationist extension of its use in the Loose Ends system \cite{kreminski:loose}. Where
+simulationist extension of its use in the Loose Ends system. 
+% TODO: a versu citation should go here
+Where
 Loose Ends is a “strong story” system, in which a story sifter acts to guide a human
 author with ultimate control over the plot, our proposed system takes a “strong autonomy”
 approach, where the story sifter guides the characters, who otherwise make their own
@@ -98,44 +100,118 @@ decisions.
 Guided by the work of Max Kreminski, Noah Wardrip-Fruin, and Michael Mateas in Authoring
 For Story Sifters \cite{kreminski:authoring}, we intend to address the most glaring issue
 with interactive emergent narrative: “the dissolution of the player-perceived story into a
-structureless mess”.
+structureless mess”. While Shepherd characters make their own decisions, they are guided
+by the drama manager to advance and complete story arcs. By sifting simultaneously with
+generation, Shepherd provides structure to the story itself rather than looking for
+narratives post-generation as the wizard of Bad News does. Although this sacrifices some
+randomness and chaos during the generation phase, the corresponding reward of coherence is
+far more impactful. In addition, because Shepherd remains a “strong autonomy” system, the
+characters continue to make decisions and create stories that surprise. As a result,
+Shepherd will generate stories that deviate from the established story templates which
+players will narrativize themselves as they do in Dwarf Fortress or The Sims.
+% TODO: cite DF/Sims?
 
 \section{Technical Description}
-We propose a very simple simulation. Each simulation is instantiated with a set of
-characters, a set of traits for those characters, and a set of actions for those
-characters to take. Actions may apply to nothing, or may apply to some other character in
-the simulation. The simulation handles time as a series of time-steps, where each
-character may take one action per time-step in a predetermined order. Furthermore, the
-simulation tracks a friendliness value between each pair of characters.  
+The basic building blocks of a Shepherd world are time, characters, actions, traits, and
+templates. The interactions between all of these pieces, as well as the drama manager,
+form the basis for rich emergent stories.
 
-For each character on each time-step, the character will choose an action according to the
-following procedure:
+\subsection{Time}
+In Shepherd, time is divided into a series of discrete time steps. For each time step,
+each character in the simulation may perform one action. For ease of computation, all
+actions are internally represented as taking place in sequence. However, readers may
+construct narratives in which actions within the same time step happen in parallel. This
+openness to interpretation helps facilitate narrativization.
 
-\begin{itemize}
-    \item Generate a pool of possible actions for that character, based on
-        \begin{itemize}
-            \item Actions that advance existing story goals
-            \item A few randomly generated actions, to add unpredictability
-            \item A pool of always-available actions
-            \item A pool of conditionally-available actions whose preconditions are met
-        \end{itemize}
-    \item 
-        Generate a utility score for each action. Utility is based on
-        \begin{itemize}
-            \item The character’s traits
-            \item The relationship between the character and the target of the action (if
-                applicable)
-            \item How many story goals the action would progress
-        \end{itemize}
-    \item Pick an action from the pool randomly, where actions with higher utility scores
-        are more likely to be chosen 
-    \item Update the simulation state to account for the effects of the chosen action
-\end{itemize}
+\subsection{Characters}
+Characters in Shepherd are semi-autonomous agents. Every time step, each character
+generates a utility score for each possible action they can take, based on that
+character's traits. The utility score is combined with the drama manager's score for that
+action to produce an overall score. Then, the character makes a weighted random choice
+between all possible actions, with each action's overall score used as its weight.
 
-Each action will have an associated natural-language representation template, which will
-be filled in with the appropriate character names once the action is performed. This
-natural-language string will then be written to the frontend to expose that event to the
-reader as part of the simulation chronicle. 
+This method of modeling character decisions allows for character choices to follow
+consistent trends, which is good for allowing the audience to understand each character.
+However, it also allows characters to infrequently act out of character, creating
+narrative intrigue.
+
+\subsection{Actions}
+An action is an event in the story world that can be triggered by some character (the
+actor). Some actions are monadic, and have only an actor; however, other actions are
+dyadic, and involve a separate character who is not the actor (the target). Each character
+may only serve as the actor for one action per time step, but each character can serve as
+the target for arbitrarily many actions per time step.
+
+Each action also has a set of tags that provide higher-level information about each event:
+some examples of tags are ``friendly,'' ``food,'' and ``violent.'' Tags mainly interact
+with the rest of the system in two ways. First, when evaluating an action (via their
+traits), characters consider that action's tags when determining its utility score.
+Second, human-authored story templates can match actions based on tags. This allows a
+single line in a pattern to represent a wide variety of actions which are all narratively
+equivalent in the context of that pattern.
+
+\subsection{Traits}
+Traits are the main agents of character personality modeling, and provide the basis for
+utility-based character decision-making. Each character is assigned a consistent number of
+(currently, two) traits at character generation, and each trait has its own utility
+function. A character's utility score for a given action is the sum of the utility scores
+for each of the character's traits evaluated on that action. At a high level, this means
+that each character is likely to act in ways that are consistent with each of their
+traits: for example, a character who is friendly (high utility for actions tagged
+``friendly'') and a gourmet (high utility for actions tagged ``food'') is very likely to want to
+share a meal with some other character, because sharing a meal is tagged as both
+``friendly'' and as ``food.'' 
+
+Like tags, traits can also be used as conditions when writing templates. Thus, one
+character's traits may influence other characters' behavior via the drama manager.
+
+\subsection{Templates and the Drama Manager}
+Each template represents a sequence of narratively interesting events, such as a ``drunken
+brawl'' or ``failed flirtation.'' Templates are expressed as patterns in the Winnow
+language. Shepherd maintains a list of possible, partially filled, and complete templates;
+this list is updated each time an action is taken. Furthermore, when the drama manager
+evaluates an action, it checks to see if that action would advance any of its tracked
+story templates. Actions that advance many story templates are valued more highly by the
+drama manager, as are actions that advance story templates which are close to completion.
+This makes it more likely that characters take actions that are narratively interesting
+and which work towards resolving open plot threads.
+
+% TODO: add more?
+
+%We propose a very simple simulation. Each simulation is instantiated with a set of
+%characters, a set of traits for those characters, and a set of actions for those
+%characters to take. Actions may apply to nothing, or may apply to some other character in
+%the simulation. The simulation handles time as a series of time-steps, where each
+%character may take one action per time-step in a predetermined order.  
+%
+%For each character on each time-step, the character will choose an action according to the
+%following procedure:
+%
+%\begin{itemize}
+%    \item Generate a pool of possible actions for that character, based on
+%        \begin{itemize}
+%            \item Actions that advance existing story goals
+%            \item A few randomly generated actions, to add unpredictability
+%            \item A pool of always-available actions
+%            \item A pool of conditionally-available actions whose preconditions are met
+%        \end{itemize}
+%    \item 
+%        Generate a utility score for each action. Utility is based on
+%        \begin{itemize}
+%            \item The character’s traits
+%            \item The relationship between the character and the target of the action (if
+%                applicable)
+%            \item How many story goals the action would progress
+%        \end{itemize}
+%    \item Pick an action from the pool randomly, where actions with higher utility scores
+%        are more likely to be chosen 
+%    \item Update the simulation state to account for the effects of the chosen action
+%\end{itemize}
+%
+%Each action will have an associated natural-language representation template, which will
+%be filled in with the appropriate character names once the action is performed. This
+%natural-language string will then be written to the frontend to expose that event to the
+%reader as part of the simulation chronicle. 
 
 \section{Analysis}
 TBD
@@ -144,7 +220,18 @@ TBD
 TBD
 
 \subsection{Future Work}
-TBD
+In the future, we plan to expand the system by
+\begin{itemize}
+    \item using it to implement a murder-mystery game which will be called
+        \textit{Assassin: The Masquerade}.
+    \item adding text to each performed action that contextualizes the action with respect to each
+        story template step that is matched by that action
+    \item adding graphics that visually depict each action as it is performed
+    \item changing the UI to make it easier to track each individual character's story
+    \item possibly adding the option to filter the chronicle to only show actions
+        involving some character (i.e. show only actions where the chosen character is the
+        target or actor).
+\end{itemize}
 
 \bibliography{refs}
 
